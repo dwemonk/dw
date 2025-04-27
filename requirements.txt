@@ -1,0 +1,7 @@
+flask
+gunicorn
+pandas
+pyarrow
+google-cloud-storage
+google-auth
+google-api-python-client
