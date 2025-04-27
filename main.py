@@ -15,11 +15,9 @@ def procesar_ventas():
     source_file = "raw/ventas/facturas/2025/ventas_2025.csv"
     destination_blob = "ventas/facturas/actual/ventas_2025.parquet"
 
-    # Autenticación para Google Drive usando credenciales predeterminadas
     credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/drive.readonly"])
     drive_service = build("drive", "v3", credentials=credentials)
 
-    # Buscar archivo en Google Drive
     results = drive_service.files().list(
         q="name='ventas_2025.csv' and 'FOLDER_ID' in parents",
         fields="files(id, name)"
@@ -29,8 +27,6 @@ def procesar_ventas():
         return Response("Archivo no encontrado", status=404)
 
     file_id = files[0]["id"]
-
-    # Descargar archivo
     request = drive_service.files().get_media(fileId=file_id)
     fh = io.BytesIO()
     downloader = MediaIoBaseDownload(fh, request)
@@ -38,11 +34,9 @@ def procesar_ventas():
     while not done:
         status, done = downloader.next_chunk()
 
-    # Procesar CSV
     fh.seek(0)
     df = pd.read_csv(fh)
 
-    # Guardar como Parquet en Cloud Storage
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob)
