@@ -21,7 +21,7 @@ def procesar_ventas():
 
     # Buscar el archivo en Drive
     results = drive_service.files().list(
-        q="name='ventas_2025.csv' and 'FOLDER_ID' in parents",
+        q="name='ventas_2025.csv' and '17CFr15ijnQOKPZy2PjnRxy66Ji3Vngbr' in parents",
         fields="files(id, name)"
     ).execute()
     files = results.get("files", [])
