@@ -19,7 +19,7 @@ def procesar_ventas():
     drive_service = build("drive", "v3", credentials=credentials)
 
     results = drive_service.files().list(
-        q="name='ventas_2025.csv' and 'FOLDER_ID' in parents",
+        q="name='ventas_2025.csv' and 'https://drive.google.com/drive/folders/1ezQWfa8WZDIyoUdSuWN89NGROQd3ycbk' in parents",
         fields="files(id, name)"
     ).execute()
     files = results.get("files", [])
