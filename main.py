@@ -12,14 +12,14 @@ app = Flask(__name__)
 @app.route("/", methods=["GET"])
 def procesar_ventas():
     bucket_name = "data-dev-test-processed"
-    source_file = "raw/ventas/facturas/ventas_2025.csv"
+    source_file = "raw/ventas/actual/facturas/ventas_2025.csv"
     destination_blob = "ventas/facturas/actual/ventas_2025.parquet"
 
     credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/drive.readonly"])
     drive_service = build("drive", "v3", credentials=credentials)
 
     results = drive_service.files().list(
-        q="name='ventas_2025.csv' and '1ezQWfa8WZDIyoUdSuWN89NGROQd3ycbk' in parents",
+        q="name='ventas_2025.csv' and '17CFr15ijnQOKPZy2PjnRxy66Ji3Vngbr' in parents",
         fields="files(id, name)"
     ).execute()
     files = results.get("files", [])
