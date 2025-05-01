@@ -42,9 +42,9 @@ def procesar_ventas():
         fh.seek(0)
         df = pd.read_csv(fh)
 
-        # Mapear columnas según los nombres reales
+        # Mapear columnas según los nombres reales (ajusta según tu archivo)
         column_mapping = {
-            'Fecha': 'fecha',
+            'Id_Venta': 'id',
             'Producto': 'producto',
             'Categoria': 'categoria',
             'Region': 'region',
@@ -52,40 +52,38 @@ def procesar_ventas():
             'Vendedor': 'vendedor',
             'Cantidad': 'cantidad',
             'Precio_Unitario': 'precio_unitario',
-            'Total_Venta': 'total_venta'
+            'Fecha_Venta': 'fecha'
         }
         df = df.rename(columns=column_mapping)
 
         # Validar columnas esperadas
-        expected_columns = ['fecha', 'producto', 'categoria', 'region', 'cliente', 'vendedor', 'cantidad', 'precio_unitario', 'total_venta']
+        expected_columns = ['id', 'producto', 'categoria', 'region', 'cliente', 'vendedor', 'cantidad', 'precio_unitario', 'fecha']
         missing_columns = [col for col in expected_columns if col not in df.columns]
         if missing_columns:
             return Response(f"Error: Columnas faltantes en el archivo CSV: {missing_columns}", status=500)
 
         # Transformaciones de limpieza
-        # 1. Eliminar duplicados basados en todas las columnas (ya no tenemos 'id')
-        df = df.drop_duplicates(keep='first')
+        # 1. Eliminar duplicados basados en 'id'
+        df = df.drop_duplicates(subset=['id'], keep='first')
 
         # 2. Validar y corregir valores
         df['precio_unitario'] = pd.to_numeric(df['precio_unitario'], errors='coerce')
         df['cantidad'] = pd.to_numeric(df['cantidad'], errors='coerce')
-        df['total_venta'] = pd.to_numeric(df['total_venta'], errors='coerce')
         df = df[df['precio_unitario'] > 0]  # Filtrar precios <= 0
         df = df[df['cantidad'] > 0]  # Filtrar cantidades <= 0
-        df = df[df['total_venta'] > 0]  # Filtrar totales <= 0
-        df['producto'] = df['producto'].fillna('Desconocido')  # Rellenar nulos
-        df['categoria'] = df['categoria'].fillna('Sin Categoria')  # Rellenar nulos
-        df['region'] = df['region'].fillna('Desconocida')  # Rellenar nulos
-        df['cliente'] = df['cliente'].fillna('Desconocido')  # Rellenar nulos
-        df['vendedor'] = df['vendedor'].fillna('Desconocido')  # Rellenar nulos
+        df['producto'] = df['producto'].fillna('Desconocido')
+        df['categoria'] = df['categoria'].fillna('Desconocido')
+        df['region'] = df['region'].fillna('Desconocido')
+        df['cliente'] = df['cliente'].fillna('Desconocido')
+        df['vendedor'] = df['vendedor'].fillna('Desconocido')
 
         # 3. Estandarizar formatos
-        df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')  # Convertir a datetime
-        df['producto'] = df['producto'].str.upper()  # Convertir a mayúsculas
-        df['categoria'] = df['categoria'].str.upper()  # Convertir a mayúsculas
-        df['region'] = df['region'].str.upper()  # Convertir a mayúsculas
-        df['cliente'] = df['cliente'].str.title()  # Capitalizar nombres
-        df['vendedor'] = df['vendedor'].str.title()  # Capitalizar nombres
+        df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')  # Convertir a datetime, ignorar errores
+        df['producto'] = df['producto'].str.upper()
+        df['categoria'] = df['categoria'].str.upper()
+        df['region'] = df['region'].str.upper()
+        df['cliente'] = df['cliente'].str.upper()
+        df['vendedor'] = df['vendedor'].str.upper()
 
         # Escribir a Parquet
         storage_client = storage.Client()
