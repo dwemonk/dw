@@ -1,6 +1,6 @@
 from flask import Flask, Response
 import pandas as pd
-from google.cloud import storage
+from google.cloud import storage, bigquery
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import io
@@ -11,6 +11,7 @@ app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def procesar_ventas():
+    project_id = "data-dev-test"
     bucket_name = "data-dev-test-processed"
     source_file = "raw/ventas/actual/facturas/ventas_2025.csv"
     destination_blob = "ventas/facturas/actual/ventas_2025.parquet"
@@ -92,7 +93,58 @@ def procesar_ventas():
         df.to_parquet("/tmp/ventas_2025.parquet", index=False)
         blob.upload_from_filename("/tmp/ventas_2025.parquet")
 
-        return Response("Procesado exitosamente", status=200)
+        # Cargar a BigQuery
+        bq_client = bigquery.Client(project=project_id)
+        table_id = f"{project_id}.ventas_landing.raw_facturas_2025"
+        schema = [
+            bigquery.SchemaField("id", "INTEGER"),
+            bigquery.SchemaField("producto", "STRING"),
+            bigquery.SchemaField("categoria", "STRING"),
+            bigquery.SchemaField("region", "STRING"),
+            bigquery.SchemaField("cliente", "STRING"),
+            bigquery.SchemaField("vendedor", "STRING"),
+            bigquery.SchemaField("cantidad", "INTEGER"),
+            bigquery.SchemaField("precio_unitario", "FLOAT"),
+            bigquery.SchemaField("fecha", "DATETIME"),
+        ]
+        job_config = bigquery.LoadJobConfig(
+            schema=schema,
+            source_format=bigquery.SourceFormat.PARQUET,
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+            autodetect=False
+        )
+        uri = f"gs://{bucket_name}/{destination_blob}"
+        load_job = bq_client.load_table_from_uri(uri, table_id, job_config=job_config)
+        load_job.result()  # Espera a que la carga se complete
+
+        # Crear tabla transformada fact_ventas_2025
+        query = """
+        CREATE OR REPLACE TABLE `ventas_analytics.fact_ventas_2025`
+        PARTITION BY DATE(fecha)
+        CLUSTER BY region
+        AS
+        SELECT
+            id,
+            producto,
+            categoria,
+            region,
+            cliente,
+            vendedor,
+            cantidad,
+            precio_unitario,
+            fecha,
+            (precio_unitario * cantidad) AS total,
+            EXTRACT(MONTH FROM fecha) AS mes,
+            CASE
+                WHEN (precio_unitario * cantidad) > 1000 THEN 'Alta'
+                ELSE 'Baja'
+            END AS tipo_venta
+        FROM `ventas_landing.raw_facturas_2025`;
+        """
+        query_job = bq_client.query(query)
+        query_job.result()  # Espera a que la query se complete
+
+        return Response("Procesado exitosamente y cargado a BigQuery", status=200)
 
     except Exception as e:
         return Response(f"Error interno: {str(e)}", status=500)
