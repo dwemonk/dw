@@ -6,6 +6,8 @@ from googleapiclient.http import MediaIoBaseDownload
 import io
 import google.auth
 import os
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 app = Flask(__name__)
 
@@ -79,18 +81,21 @@ def procesar_ventas():
         df['vendedor'] = df['vendedor'].fillna('Desconocido')
 
         # 3. Estandarizar formatos
-        df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')  # Convertir a datetime, ignorar errores
+        df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce', utc=True)  # Convertir a datetime con UTC
         df['producto'] = df['producto'].str.upper()
         df['categoria'] = df['categoria'].str.upper()
         df['region'] = df['region'].str.upper()
         df['cliente'] = df['cliente'].str.upper()
         df['vendedor'] = df['vendedor'].str.upper()
 
-        # Escribir a Parquet
+        # Escribir a Parquet con tipo de timestamp explícito
+        # Convertir el DataFrame a una tabla PyArrow con tipo de timestamp anotado
+        table = pa.Table.from_pandas(df, preserve_index=False, timestamps_to_ms=True)  # Forzar timestamps a milisegundos
+        pq.write_table(table, "/tmp/ventas_2025.parquet")
+
         storage_client = storage.Client()
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(destination_blob)
-        df.to_parquet("/tmp/ventas_2025.parquet", index=False)
         blob.upload_from_filename("/tmp/ventas_2025.parquet")
 
         # Cargar a BigQuery
@@ -111,7 +116,12 @@ def procesar_ventas():
             schema=schema,
             source_format=bigquery.SourceFormat.PARQUET,
             write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            autodetect=False
+            autodetect=False,
+            # Especificar el tipo de timestamp en la carga
+            time_partitioning=bigquery.TimePartitioning(
+                type_=bigquery.TimePartitioningType.DAY,
+                field="fecha"
+            ),
         )
         uri = f"gs://{bucket_name}/{destination_blob}"
         load_job = bq_client.load_table_from_uri(uri, table_id, job_config=job_config)
