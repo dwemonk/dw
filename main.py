@@ -68,7 +68,7 @@ def procesar_ventas():
         df = df.drop_duplicates(subset=['id'], keep='first')
 
         # 2. Validar y corregir valores
-        df['precio_unitario'] = pd.to_numeric(df['precio_unitario'], errors='coerce')
+        df['precio_unitario'] = pd.to_numeric(df['precio_unitario'], errors='coerce').astype('float64')  # Forzar float64
         df['cantidad'] = pd.to_numeric(df['cantidad'], errors='coerce')
         df = df[df['precio_unitario'] > 0]  # Filtrar precios <= 0
         df = df[df['cantidad'] > 0]  # Filtrar cantidades <= 0
